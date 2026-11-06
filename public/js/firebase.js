@@ -1,7 +1,7 @@
 
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,updateProfile,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js';
-import {getDatabase,ref,onValue,runTransaction,serverTimestamp} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-database.js';
+import {getDatabase,ref,get,set,update,onDisconnect,onValue,runTransaction,serverTimestamp} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-database.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-functions.js';
 const config={apiKey:'AIzaSyAiRsvAnNal-w7wwOj1YqwemLfffMMagjI',authDomain:'ginhawa-app.firebaseapp.com',databaseURL:'https://ginhawa-app-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'ginhawa-app',storageBucket:'ginhawa-app.firebasestorage.app',messagingSenderId:'341314764610',appId:'1:341314764610:web:d1cdfbb4886dc3dbe552db',measurementId:'G-21040X11RH'};
 const app=initializeApp(config),auth=getAuth(app),db=getDatabase(app),functions=getFunctions(app,'asia-southeast1');
@@ -20,11 +20,12 @@ async function upsertProfile(user,name='',role='customer'){
  await runTransaction(path,old=>old===null?{uid:user.uid,displayName:name||user.displayName||user.email?.split('@')[0]||'Ginhawa User',email:user.email||'',requestedRole:role==='therapist'?'therapist':'customer',createdAt:serverTimestamp()}:undefined,{applyLocally:false});
 }
 async function googleLogin(){const provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});const r=await signInWithPopup(auth,provider);await upsertProfile(r.user);return r.user}
-async function doLogin(event){event.preventDefault();const form=event.target,button=form.querySelector('button[type=submit]');button.disabled=true;try{await signInWithEmailAndPassword(auth,form.email.value,form.password.value);location.assign('profile.html')}catch(e){notify(e.message)}finally{button.disabled=false}}
+async function doLogin(event){event.preventDefault();const form=event.target,button=form.querySelector('button[type=submit]');button.disabled=true;try{await signInWithEmailAndPassword(auth,form.email.value,form.password.value);location.assign(nextUrl())}catch(e){notify(e.message)}finally{button.disabled=false}}
 async function doSignup(event){event.preventDefault();const form=event.target,button=form.querySelector('button[type=submit]');button.disabled=true;try{const r=await createUserWithEmailAndPassword(auth,form.email.value,form.password.value);await updateProfile(r.user,{displayName:form.fullName.value.trim()});await upsertProfile(r.user,form.fullName.value.trim(),form.role.value);location.assign('profile.html')}catch(e){notify(e.message)}finally{button.disabled=false}}
+function nextUrl(){const next=new URLSearchParams(location.search).get('next');return next&&/^[a-z][a-z0-9-]*\.html$/i.test(next)?next:'profile.html'}
 document.getElementById('auth-login')?.addEventListener('submit',doLogin);
 document.getElementById('auth-signup')?.addEventListener('submit',doSignup);
-document.getElementById('google-login')?.addEventListener('click',async()=>{try{await googleLogin();location.assign('profile.html')}catch(e){notify(e.message)}});
+document.getElementById('google-login')?.addEventListener('click',async()=>{try{await googleLogin();location.assign(nextUrl())}catch(e){notify(e.message)}});
 document.getElementById('logout')?.addEventListener('click',async()=>{await signOut(auth);location.assign('index.html')});
 function loadBookings(user){const target=document.getElementById('bookings-list');if(!target)return;
  onValue(ref(db,'customerBookings/'+user.uid),snap=>{const bookings=Object.entries(snap.val()||{}).sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));target.innerHTML=bookings.length?bookings.map(([id,b])=>'<article class="status"><b>'+esc(b.serviceId||'Service')+'</b> · '+esc(b.date)+' · '+esc(b.time)+'<br><span class="muted">'+esc(b.city)+' · '+esc(b.status||'searching')+'</span><br><small>'+esc(id)+'</small></article>').join(''):'No requests yet. Book a service to start.'},e=>target.textContent=e.message);
@@ -39,5 +40,40 @@ document.getElementById('booking-form')?.addEventListener('submit',async e=>{e.p
  const selection={serviceId:f.serviceId.value,therapistId:null,mode,date:f.date.value,time:f.time.value,city:f.city.value,address:f.address.value,location:mode==='online'?null:{lat:Number(lat),lng:Number(lng)}};
  button.disabled=true;try{const res=await httpsCallable(functions,'submitBooking')(selection);const id=res.data?.bookingId;document.getElementById('booking-feedback').textContent='Booking request sent ('+id+'). We are finding an eligible therapist. Follow status in My Bookings.';notify('Request submitted');f.reset();window.GinhawaLocation?.reset()}catch(err){notify(err.message)}finally{button.disabled=false}
 });
-const booking=document.getElementById('booking-form');if(booking){try{const saved=JSON.parse(sessionStorage.getItem('ginhawa-booking')||'null');if(saved){for(const [key,value] of Object.entries(saved))if(booking.elements[key])booking.elements[key].value=value;sessionStorage.removeItem('ginhawa-booking')}}catch{}}
-window.GinhawaFirebase={app,auth,db,functions,authReady,googleLogin};
+const booking=document.getElementById('booking-form');if(booking){
+ const params=new URLSearchParams(location.search), service=params.get('service');
+ if(service&&Array.from(booking.elements.serviceId.options).some(o=>o.value===service))booking.elements.serviceId.value=service;
+ const mode=booking.elements.mode, address=booking.elements.address, box=document.getElementById('location-picker-card');
+ const updateMode=()=>{const online=mode.value==='online';address.required=!online;box?.classList.toggle('hide',online);if(online)address.value=''};
+ mode.addEventListener('change',updateMode);updateMode();
+ try{const saved=JSON.parse(sessionStorage.getItem('ginhawa-booking')||'null');if(saved){for(const [key,value] of Object.entries(saved))if(booking.elements[key])booking.elements[key].value=value;sessionStorage.removeItem('ginhawa-booking');updateMode()}}catch{}
+}
+let providerTimer=null,providerDisconnect=null;
+async function geoPoint(){return await new Promise((resolve,reject)=>{if(!navigator.geolocation){reject(new Error('GPS is unavailable'));return}navigator.geolocation.getCurrentPosition(pos=>resolve({lat:pos.coords.latitude,lng:pos.coords.longitude}),reject,{enableHighAccuracy:true,timeout:15000,maximumAge:30000})})}
+async function verifyProvider(){
+ await authReady;const user=auth.currentUser;if(!user)throw new Error('Sign in as an approved therapist first');
+ const [token,profile]=await Promise.all([user.getIdTokenResult(true),get(ref(db,'providerProfiles/'+user.uid))]);
+ if(token.claims.therapist!==true||profile.val()?.verified!==true||profile.val()?.active!==true)throw new Error('Ginhawa therapist approval is required');
+ return user;
+}
+async function goOnline(){
+ const user=await verifyProvider();const point=await geoPoint();
+ if(point.lat<4||point.lat>22||point.lng<116||point.lng>128)throw new Error('GPS must be within the Philippines');
+ const status=document.getElementById('provider-location-status'),refPresence=ref(db,'providerPresence/'+user.uid);
+ await onDisconnect(refPresence).update({online:false,updatedAt:serverTimestamp()});
+ const updatePoint=async p=>{if(auth.currentUser?.uid!==user.uid)return;await update(refPresence,{online:true,lat:p.lat,lng:p.lng,updatedAt:serverTimestamp()});if(status)status.textContent='Online for nearby booking requests · GPS '+p.lat.toFixed(4)+', '+p.lng.toFixed(4)};
+ await updatePoint(point);clearInterval(providerTimer);
+ providerTimer=setInterval(async()=>{try{await updatePoint(await geoPoint())}catch(e){console.warn('Therapist GPS heartbeat:',e.message)}},60000);
+}
+async function goOffline(){
+ clearInterval(providerTimer);providerTimer=null;
+ if(!auth.currentUser)return;
+ const refPresence=ref(db,'providerPresence/'+auth.currentUser.uid);
+ await update(refPresence,{online:false,updatedAt:serverTimestamp()});
+ await onDisconnect(refPresence).cancel();
+ const status=document.getElementById('provider-location-status');if(status)status.textContent='Offline · not accepting new requests';
+}
+for(const [id,handler] of [['provider-online',goOnline],['provider-offline',goOffline]]){
+ document.getElementById(id)?.addEventListener('click',async e=>{const button=e.currentTarget;button.disabled=true;try{await handler();notify(id==='provider-online'?'You are available for nearby requests':'You are offline')}catch(err){notify(err.message)}finally{button.disabled=false}});
+}
+window.GinhawaFirebase={app,auth,db,functions,authReady,googleLogin,goOnline,goOffline};
