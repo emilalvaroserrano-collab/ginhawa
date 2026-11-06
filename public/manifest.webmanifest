@@ -1,0 +1,11 @@
+{
+  "name": "Ginhawa App",
+  "short_name": "Ginhawa",
+  "description": "Wellness booking PWA",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#86080e",
+  "background_color": "#fffaf0",
+  "icons": []
+}
