@@ -116,7 +116,6 @@
       window.setTimeout(() => {
         if (modal.classList.contains('open')) {
           googleMaps.event.trigger(map, 'resize');
-          map.setCenter(chosen || DEFAULT_CENTER);
           readout();
         }
       }, 80);
