@@ -1,11 +1,32 @@
 {
   "name": "Ginhawa App",
   "short_name": "Ginhawa",
-  "description": "Wellness booking PWA",
+  "description": "Wellness booking and nearby therapist matching",
+  "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "theme_color": "#86080e",
   "background_color": "#fffaf0",
-  "icons": []
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
 }
