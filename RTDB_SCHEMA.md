@@ -59,3 +59,5 @@ See `README_NATIVE_DISPATCH.md` for full booking, privacy and authority contract
 ```
 
 `submitBooking` and `respondToOffer` are callable Cloud Functions; the browser cannot write `/bookingRequests`, `/customerBookings`, `/assignedBookings`, or `/providerInbox` directly.
+## Launch-mode therapist activation
+New therapist accounts can be activated by the server-side `activateTherapist` callable after explicit signup consent. Their provider records use `active: true`, `onboardingStatus: 'auto_approved'`, `verified: false`, and restricted service IDs for non-clinical general wellness. RTDB presence and offer inbox are gated by the server-issued therapist custom claim plus active provider profile status. No browser write can set the claim. See `README_AUTO_ONBOARDING.md`.

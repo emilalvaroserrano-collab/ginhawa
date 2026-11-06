@@ -38,3 +38,5 @@ Live Google/Firebase Auth and RTDB writes, deployed functions, push delivery, GP
 ## Functional scope
 
 Customer booking requests are **requests**, not confirmed paid sessions. A verified therapist can accept the request. This update does not implement payment capture, licensing review workflows, completion check-offs, refunds or insurance fund transactions.
+
+Automatic onboarding policy: [README_AUTO_ONBOARDING.md](README_AUTO_ONBOARDING.md).
