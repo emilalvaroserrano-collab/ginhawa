@@ -29,6 +29,11 @@ jobs:
         run: |
           node --check public/js/app.js
           node --check public/js/location.js
+          node --check public/js/google-maps-config.js
+          node --check public/js/runtime-config.js
+          node --check scripts/build-client-config.mjs
+          node --check functions/index.js
+          node --test functions/matching.test.js
           node --input-type=module --check < public/js/firebase.js
           python3 - <<'PY'
           import struct, pathlib, json, zlib
