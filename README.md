@@ -1,3 +1,5 @@
+**Production frontend: Vercel** — see [README_VERCEL.md](README_VERCEL.md) for static hosting and Firebase configuration.
+
 # Ginhawa App — Native Mobile PWA + Firebase Authentication + Realtime Therapist Dispatch
 
 **Primary guide: [README_NATIVE_DISPATCH.md](README_NATIVE_DISPATCH.md)**
