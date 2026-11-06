@@ -23,8 +23,26 @@ async function upsertProfile(user,name='',role='customer'){
 }
 async function googleLogin(){const provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});const r=await signInWithPopup(auth,provider);await upsertProfile(r.user);return r.user}
 async function doLogin(event){event.preventDefault();const form=event.target,button=form.querySelector('button[type=submit]');button.disabled=true;try{await signInWithEmailAndPassword(auth,form.email.value,form.password.value);location.assign(nextUrl())}catch(e){notify(e.message)}finally{button.disabled=false}}
-async function doSignup(event){event.preventDefault();const form=event.target,button=form.querySelector('button[type=submit]');button.disabled=true;try{const r=await createUserWithEmailAndPassword(auth,form.email.value,form.password.value);await updateProfile(r.user,{displayName:form.fullName.value.trim()});await upsertProfile(r.user,form.fullName.value.trim(),form.elements.namedItem('role').value);location.assign('profile.html')}catch(e){notify(e.message)}finally{button.disabled=false}}
+async function doSignup(event){event.preventDefault();const form=event.target,button=form.querySelector('button[type=submit]');button.disabled=true;try{const r=await createUserWithEmailAndPassword(auth,form.email.value,form.password.value);await updateProfile(r.user,{displayName:form.fullName.value.trim()});const role=form.elements.namedItem('role').value;await upsertProfile(r.user,form.fullName.value.trim(),role);if(role==='therapist'){if(!form.elements.namedItem('therapistAgreement').checked)throw new Error('Accept the therapist code of conduct first.');await httpsCallable(functions,'activateTherapist')({acceptCodeOfConduct:true});await r.user.getIdToken(true)}location.assign(role==='therapist'?'therapist-dashboard.html':'profile.html')}catch(e){notify(e.message)}finally{button.disabled=false}}
 function nextUrl(){const next=new URLSearchParams(location.search).get('next');return next&&/^[a-z][a-z0-9-]*\.html$/i.test(next)?next:'profile.html'}
+
+document.getElementById('google-signup')?.addEventListener('click',async()=>{
+ try{
+  const form=document.getElementById('auth-signup');
+  const role=form?.elements.namedItem('role').value||'customer';
+  if(role==='therapist'&&!form.elements.namedItem('therapistAgreement').checked)throw new Error('Accept the therapist code of conduct before continuing.');
+  const user=await googleLogin();
+  if(role==='therapist'){await httpsCallable(functions,'activateTherapist')({acceptCodeOfConduct:true});await user.getIdToken(true)}
+  location.assign(role==='therapist'?'therapist-dashboard.html':'profile.html');
+ }catch(e){notify(e.message)}
+});
+const signupRole=document.querySelector('#auth-signup [name=role]');
+signupRole?.addEventListener('change',()=>{
+ const terms=document.getElementById('therapist-agreement');
+ terms?.classList.toggle('hide',signupRole.value!=='therapist');
+ const box=terms?.querySelector('input');if(box)box.required=signupRole.value==='therapist';
+});
+
 document.getElementById('auth-login')?.addEventListener('submit',doLogin);
 document.getElementById('auth-signup')?.addEventListener('submit',doSignup);
 document.getElementById('google-login')?.addEventListener('click',async()=>{try{await googleLogin();location.assign(nextUrl())}catch(e){notify(e.message)}});
@@ -33,7 +51,7 @@ function loadBookings(user){const target=document.getElementById('bookings-list'
  onValue(ref(db,'customerBookings/'+user.uid),snap=>{const bookings=Object.entries(snap.val()||{}).sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));target.innerHTML=bookings.length?bookings.map(([id,b])=>'<article class="status"><b>'+esc(b.serviceId||'Service')+'</b> · '+esc(b.date)+' · '+esc(b.time)+'<br><span class="muted">'+esc(b.city)+' · '+esc(b.status||'searching')+'</span><br><small>'+esc(id)+'</small></article>').join(''):'No requests yet. Book a service to start.'},e=>target.textContent=e.message);
 }
 function loadOffers(user){const target=document.getElementById('offers-list');if(!target)return;
- onValue(ref(db,'providerInbox/'+user.uid),snap=>{const entries=Object.entries(snap.val()||{});target.replaceChildren();if(!entries.length){target.textContent='No nearby offers. Only verified, active therapists receive requests.';return}
+ onValue(ref(db,'providerInbox/'+user.uid),snap=>{const entries=Object.entries(snap.val()||{});target.replaceChildren();if(!entries.length){target.textContent='No nearby offers. Active therapists are notified when an eligible general-wellness booking is nearby.';return}
  for(const [id,b] of entries){const row=document.createElement('article');row.className='status';const label=document.createElement('div');label.textContent=(b.serviceName||b.serviceId||'Service')+' · '+(b.city||'')+' · '+(b.status||'offered');row.appendChild(label);if(b.status==='offered'){for(const decision of ['accept','decline']){const button=document.createElement('button');button.className='btn '+(decision==='decline'?'light':'');button.style.marginRight='8px';button.style.marginTop='10px';button.textContent=decision==='accept'?'Accept':'Decline';button.onclick=async()=>{button.disabled=true;try{await httpsCallable(functions,'respondToOffer')({bookingId:b.bookingId||id,decision});notify('Response recorded')}catch(e){notify(e.message)}finally{button.disabled=false}};row.appendChild(button)}}target.appendChild(row)}} ,e=>target.textContent=e.message)
 }
 document.getElementById('booking-form')?.addEventListener('submit',async e=>{e.preventDefault();const f=e.target,button=f.querySelector('[type=submit]');if(!auth.currentUser){sessionStorage.setItem('ginhawa-booking',JSON.stringify(Object.fromEntries(new FormData(f))));location.assign('login.html?next=booking.html');return}
@@ -53,9 +71,9 @@ const booking=document.getElementById('booking-form');if(booking){
 let providerTimer=null,providerDisconnect=null;
 async function geoPoint(){return await new Promise((resolve,reject)=>{if(!navigator.geolocation){reject(new Error('GPS is unavailable'));return}navigator.geolocation.getCurrentPosition(pos=>resolve({lat:pos.coords.latitude,lng:pos.coords.longitude}),reject,{enableHighAccuracy:true,timeout:15000,maximumAge:30000})})}
 async function verifyProvider(){
- await authReady;const user=auth.currentUser;if(!user)throw new Error('Sign in as an approved therapist first');
+ await authReady;const user=auth.currentUser;if(!user)throw new Error('Sign in with a therapist account first');
  const [token,profile]=await Promise.all([user.getIdTokenResult(true),get(ref(db,'providerProfiles/'+user.uid))]);
- if(token.claims.therapist!==true||profile.val()?.verified!==true||profile.val()?.active!==true)throw new Error('Ginhawa therapist approval is required');
+ if(token.claims.therapist!==true||profile.val()?.active!==true||!(profile.val()?.verified===true||profile.val()?.onboardingStatus==='auto_approved'))throw new Error('Complete therapist signup to activate your account');
  return user;
 }
 async function goOnline(){

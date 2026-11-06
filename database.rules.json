@@ -119,7 +119,7 @@
     "providerPresence": {
       "$uid": {
         ".read": "auth !== null && (auth.uid === $uid || auth.token.admin === true)",
-        ".write": "auth !== null && auth.uid === $uid && auth.token.therapist === true && root.child('providerProfiles').child($uid).child('verified').val() === true && root.child('providerProfiles').child($uid).child('active').val() === true && newData.exists()",
+        ".write": "auth !== null && auth.uid === $uid && auth.token.therapist === true && (root.child('providerProfiles').child($uid).child('verified').val() === true || root.child('providerProfiles').child($uid).child('onboardingStatus').val() === 'auto_approved') && root.child('providerProfiles').child($uid).child('active').val() === true && newData.exists()",
         ".validate": "newData.hasChildren(['online','lat','lng','updatedAt'])",
         "online": {
           ".validate": "newData.isBoolean()"
@@ -142,7 +142,7 @@
       "$uid": {
         ".read": "auth !== null && (auth.uid === $uid || auth.token.admin === true)",
         "$key": {
-          ".write": "auth !== null && auth.uid === $uid && auth.token.therapist === true && root.child('providerProfiles').child($uid).child('verified').val() === true",
+          ".write": "auth !== null && auth.uid === $uid && auth.token.therapist === true && (root.child('providerProfiles').child($uid).child('verified').val() === true || root.child('providerProfiles').child($uid).child('onboardingStatus').val() === 'auto_approved') && root.child('providerProfiles').child($uid).child('active').val() === true",
           ".validate": "newData.isString() && newData.val().length > 20 && newData.val().length <= 512"
         }
       }

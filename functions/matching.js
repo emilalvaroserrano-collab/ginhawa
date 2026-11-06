@@ -16,7 +16,7 @@ function supportsService(profile,serviceId){
 function rankedCandidates({booking,profiles,presence,alreadyOffered={},now=Date.now(),limit=3,maxDistanceKm=MAX_DISTANCE_KM}){
   const results=[];
   for(const [uid,profile] of Object.entries(profiles||{})){
-    if(!profile?.verified||profile?.active!==true||!supportsService(profile,booking.serviceId)||alreadyOffered[uid])continue;
+    if(!(profile?.verified===true||profile?.onboardingStatus==='auto_approved')||profile?.active!==true||!supportsService(profile,booking.serviceId)||alreadyOffered[uid])continue;
     if(booking.requestedTherapistUid&&uid!==booking.requestedTherapistUid)continue;
     const online=presence?.[uid];
     if(booking.requestedTherapistUid){

@@ -6,6 +6,7 @@ const {onSchedule}=require('firebase-functions/v2/scheduler');
 const logger=require('firebase-functions/logger');
 const {initializeApp}=require('firebase-admin/app');
 const {getDatabase}=require('firebase-admin/database');
+const {getAuth}=require('firebase-admin/auth');
 const {getMessaging}=require('firebase-admin/messaging');
 const {rankedCandidates}=require('./matching');
 initializeApp({databaseURL:'https://ginhawa-app-default-rtdb.asia-southeast1.firebasedatabase.app'});
@@ -23,6 +24,9 @@ function validateLocation(l){
   if(l.lat<4||l.lat>22||l.lng<116||l.lng>128)invalid('Location must be within the service region (Philippines).');
   return {lat:+l.lat.toFixed(6),lng:+l.lng.toFixed(6)};
 }
+function isTherapistEligible(profile) {
+ return profile?.active===true && (profile.verified===true || profile.onboardingStatus==='auto_approved');
+}
 function requireAuth(req){
   if(!req.auth?.uid)throw new HttpsError('unauthenticated','Sign in to continue.');
   return req.auth.uid;
@@ -33,6 +37,34 @@ function requestPublicStatus(b){
     address:b.address||'',location:b.location||null,status:b.status,assignedTherapistUid:b.assignedTherapistUid||null,
     createdAt:b.createdAt,updatedAt:b.updatedAt||b.createdAt};
 }
+
+/**
+ * Temporary launch policy: automatically enable GENERAL WELLNESS providers.
+ * This is NOT credential/license verification. Clinical services must remain gated.
+ * Authenticated users explicitly opt into therapist terms before receiving the role.
+ */
+exports.activateTherapist=onCall({region:REGION,maxInstances:10},async req=>{
+ const uid=requireAuth(req);
+ if(req.data?.acceptCodeOfConduct!==true)invalid('Accept the therapist terms and code of conduct to activate your profile.');
+ const account=await getAuth().getUser(uid);
+ if(!account.email || account.disabled)throw new HttpsError('permission-denied','A valid active email account is required.');
+ const providerRef=db.ref('providerProfiles/'+uid);
+ const now=Date.now();
+ const safeName=string(account.displayName,120)||string(account.email.split('@')[0],120)||'Ginhawa Therapist';
+ const tx=await providerRef.transaction(current=>current===null?{
+   uid,displayName:safeName,active:true,verified:false,autoApproved:true,
+   onboardingStatus:'auto_approved',credentialStatus:'not_verified',
+   serviceIds:{massage:true,wellness:true,home:true},
+   createdAt:now,updatedAt:now
+ }:undefined,undefined,false);
+ const profile=tx.snapshot.val();
+ if(!profile?.active||!isTherapistEligible(profile))throw new HttpsError('permission-denied','This therapist account is restricted.');
+ const claims=account.customClaims||{};
+ if(claims.therapist!==true)await getAuth().setCustomUserClaims(uid,{...claims,therapist:true});
+ await db.ref('profiles/'+uid).update({requestedRole:'therapist',therapistOnboardedAt:now});
+ return {status:'active',onboardingStatus:profile.onboardingStatus||'approved',credentialVerified:profile.verified===true,serviceIds:Object.keys(profile.serviceIds||{})};
+});
+
 exports.submitBooking=onCall({region:REGION,maxInstances:10},async req=>{
   const uid=requireAuth(req),data=req.data||{};
   const serviceId=string(data.serviceId,64),therapistId=string(data.therapistId,80)||null;
@@ -49,10 +81,10 @@ exports.submitBooking=onCall({region:REGION,maxInstances:10},async req=>{
   if(therapistId){
     const pSnap=await db.ref(`catalog/therapists/${therapistId}`).get();
     const p=pSnap.val();
-    if(!p?.verified||!p?.published||typeof p.uid!=='string')throw new HttpsError('failed-precondition','Selected therapist is not currently available for direct requests.');
+    if(!(p?.verified||p?.autoApproved)||!p?.published||typeof p.uid!=='string')throw new HttpsError('failed-precondition','Selected therapist is not currently available for direct requests.');
     requestedTherapistUid=p.uid;
     const profile=(await db.ref(`providerProfiles/${requestedTherapistUid}`).get()).val();
-    if(!profile?.verified||!profile?.active||!(profile.serviceIds?.[serviceId]===true||Array.isArray(profile.serviceIds)&&profile.serviceIds.includes(serviceId)))throw new HttpsError('failed-precondition','Selected therapist cannot provide this service.');
+    if(!isTherapistEligible(profile)||!(profile.serviceIds?.[serviceId]===true||Array.isArray(profile.serviceIds)&&profile.serviceIds.includes(serviceId)))throw new HttpsError('failed-precondition','Selected therapist cannot provide this service.');
   }
   const rateRef=db.ref(`bookingQuotas/${uid}/${day}`);
   const quota=await rateRef.transaction(v=>(v||0)>=MAX_REQUESTS_PER_DAY?undefined:(v||0)+1,undefined,false);
@@ -109,7 +141,7 @@ exports.respondToOffer=onCall({region:REGION,maxInstances:10},async req=>{
   const uid=requireAuth(req),bookingId=string(req.data?.bookingId,128),decision=string(req.data?.decision,12);
   if(!/^[-_a-zA-Z0-9]{5,128}$/.test(bookingId)||!['accept','decline'].includes(decision))invalid('Invalid offer response.');
   const [profileSnap,offerSnap]=await Promise.all([db.ref(`providerProfiles/${uid}`).get(),db.ref(`providerInbox/${uid}/${bookingId}`).get()]);
-  if(!profileSnap.val()?.verified||!profileSnap.val()?.active||req.auth.token.therapist!==true)throw new HttpsError('permission-denied','Therapist verification required.');
+  if(!isTherapistEligible(profileSnap.val())||req.auth.token.therapist!==true)throw new HttpsError('permission-denied','An active therapist account is required.');
   const offer=offerSnap.val();
   if(!offer||offer.status!=='offered'||offer.expiresAt<Date.now())throw new HttpsError('failed-precondition','Offer is unavailable or expired.');
   if(decision==='decline'){

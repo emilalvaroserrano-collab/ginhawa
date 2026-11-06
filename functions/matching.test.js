@@ -9,3 +9,10 @@ test('Haversine distance',()=>{assert.equal(Math.round(distanceKm(origin,origin)
 test('nearest eligible verified and active first',()=>{assert.deepEqual(rankedCandidates({booking:base,profiles,presence,now:500000}).map(x=>x.uid),['a','b']);});
 test('skip previously offered and stale presence',()=>{assert.deepEqual(rankedCandidates({booking:base,profiles,presence,alreadyOffered:{a:true},now:500000}).map(x=>x.uid),['b']);assert.deepEqual(rankedCandidates({booking:base,profiles,presence,now:900000}).map(x=>x.uid),[]);});
 test('distance radius and direct provider',()=>{assert.deepEqual(rankedCandidates({booking:{...base,requestedTherapistUid:'a'},profiles,presence:{},now:500000}).map(x=>x.uid),['a']);assert.deepEqual(rankedCandidates({booking:base,profiles,presence,now:500000,maxDistanceKm:0.01}).map(x=>x.uid),[]);});
+
+test('auto-onboarded therapists match only their allowed general wellness services',()=>{
+ const additional={auto:{verified:false,active:true,onboardingStatus:'auto_approved',serviceIds:{massage:true,wellness:true,home:true}}};
+ const pos={auto:{online:true,lat:17.6132,lng:121.727,updatedAt:500000}};
+ assert.deepEqual(rankedCandidates({booking:base,profiles:additional,presence:pos,now:500000}).map(x=>x.uid),['auto']);
+ assert.deepEqual(rankedCandidates({booking:{...base,serviceId:'rehab'},profiles:additional,presence:pos,now:500000}).map(x=>x.uid),[]);
+});
