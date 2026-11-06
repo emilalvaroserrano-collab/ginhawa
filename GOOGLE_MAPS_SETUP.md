@@ -26,3 +26,15 @@ The center-screen pin overlay is positioned using `.map-fixed-pin` CSS, and the 
 The key is a public web API key, not a server credential; never give this key unrestricted access to other APIs.
 
 This commit includes backend integration plus map module. Deploying a complete frontend additionally requires the other `public/` HTML, CSS, JS and image assets supplied in the Ginhawa source archive.
+
+## If the map says "This page didn't load Google Maps correctly"
+
+Google Maps has rejected the browser authorization or configuration. Open Chrome DevTools → Console to identify the exact error code. Common causes:
+
+- `ApiNotActivatedMapError`: enable **Maps JavaScript API** (not just Maps Static API).
+- `BillingNotEnabledMapError`: attach an active billing account to the key's Google Cloud project.
+- `RefererNotAllowedMapError`: include the actual deployed origin as an HTTP referrer (`https://<your-vercel-host>/*` and/or `https://emilalvaroserrano-collab.github.io/*`).
+- `ApiTargetBlockedMapError`: update API restrictions to permit Maps JavaScript API.
+- `InvalidKeyMapError`: correct or regenerate the browser key.
+
+The frontend now handles Google's `gm_authFailure` hook and falls back to a Leaflet/OpenStreetMap pinned map. This is *fallback behavior*, not a substitute for enabling billing and authorizing the JS API. For a commercial product with meaningful traffic, replace the public OSM tile endpoint with a tile provider whose commercial usage and capacity meet your needs.

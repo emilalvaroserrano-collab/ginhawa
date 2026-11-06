@@ -27,3 +27,7 @@ form{margin:0}.field{display:grid;gap:7px;font-weight:700;font-size:13px;margin-
   .about-feature{grid-template-columns:1fr;gap:14px}
   .wellness-photo{max-height:220px}
 }
+
+/* Location picker provider fallback notification */
+.map-engine-status{margin:0 14px 8px;padding:9px 12px;background:#fff3e0;border:1px solid #efd4a3;border-radius:10px;color:#6d3d15;font-size:12px;line-height:1.4}
+.map-engine-status[hidden]{display:none!important}

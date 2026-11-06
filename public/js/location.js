@@ -14,12 +14,19 @@
   const MAPS_URL = 'https://maps.googleapis.com/maps/api/js';
 
   let map = null;
+  let leafletMap = null;
+  let leafletLoading = null;
   let googleMapsLoading = null;
+  let googleAuthFailed = false;
+  let fallbackPromise = null;
+  const mapStatus = $('#map-engine-status');
+  const setStatus = message => { if (mapStatus) { mapStatus.hidden = !message; mapStatus.textContent = message || ''; } };
   let chosen = null;
   let touched = false;
   let focusReturn = null;
   const format = ({ lat, lng }) => `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
   const positionOf = () => {
+    if (leafletMap) { const p = leafletMap.getCenter(); return { lat: p.lat, lng: p.lng }; }
     if (!map) return chosen;
     const center = map.getCenter();
     return center ? { lat: center.lat(), lng: center.lng() } : chosen;
@@ -70,8 +77,75 @@
     });
     return googleMapsLoading;
   }
+
+  // Google calls this hook for invalid keys, referrer restrictions and billing issues.
+  // The JavaScript SDK can appear loaded before authorization fails.
+  window.gm_authFailure = () => {
+    googleAuthFailed = true;
+    console.error('[Ginhawa Maps] Google Maps authorization failed. Check the Maps JavaScript API, Cloud billing and HTTP referrer restrictions for', location.origin);
+    if (modal.classList.contains('open')) void switchToFallback('Google Maps authorization failed');
+  };
+
+  function loadLeaflet() {
+    if (window.L?.map) return Promise.resolve(window.L);
+    if (leafletLoading) return leafletLoading;
+    leafletLoading = new Promise((resolve, reject) => {
+      const cssId = 'ginhawa-leaflet-css';
+      if (!document.getElementById(cssId)) {
+        const css = document.createElement('link');
+        css.id = cssId;
+        css.rel = 'stylesheet';
+        css.href = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(css);
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+      script.async = true;
+      script.onload = () => window.L?.map ? resolve(window.L) : reject(new Error('Alternate maps library is unavailable.'));
+      script.onerror = () => reject(new Error('Alternate map script failed to load.'));
+      document.head.appendChild(script);
+    }).catch(error => { leafletLoading = null; throw error; });
+    return leafletLoading;
+  }
+
+  // Fallback leaves location selection usable even if Google rejects the browser key.
+  // For high-traffic production, configure a commercial OSM-compatible tile provider.
+  async function switchToFallback(reason) {
+    if (leafletMap) return;
+    if (fallbackPromise) return fallbackPromise;
+    fallbackPromise = (async () => {
+      console.warn('[Ginhawa Maps] Switching to OpenStreetMap:', reason);
+      setStatus('Google Maps is unavailable. Using OpenStreetMap as an alternative.');
+      if (map && window.google?.maps?.event) window.google.maps.event.clearInstanceListeners(map);
+      map = null;
+      mapNode.replaceChildren();
+      const L = await loadLeaflet();
+      if (!modal.classList.contains('open')) return;
+      const center = chosen || DEFAULT_CENTER;
+      leafletMap = L.map(mapNode, { zoomControl: true, scrollWheelZoom: false })
+        .setView([center.lat, center.lng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(leafletMap);
+      leafletMap.on('dragstart', () => { touched = true; });
+      leafletMap.on('dragend', () => readout());
+      leafletMap.on('moveend', () => readout());
+      leafletMap.on('click', event => {
+        touched = true;
+        leafletMap.panTo(event.latlng);
+        readout();
+      });
+      window.setTimeout(() => leafletMap?.invalidateSize(), 100);
+      readout();
+    })().catch(error => {
+      console.error('[Ginhawa Maps] Alternate map unavailable:', error);
+      setStatus('Map tiles are unavailable. You can still use GPS to set your location.');
+      readout('Use the GPS button to select your current coordinates.');
+    }).finally(() => { fallbackPromise = null; });
+    return fallbackPromise;
+  }
   function createMap(googleMaps) {
-    if (map) return;
+    if (map || leafletMap || googleAuthFailed) return;
     map = new googleMaps.Map(mapNode, {
       center: chosen || DEFAULT_CENTER,
       zoom: 15,
@@ -108,9 +182,23 @@
     }
     readout('Loading Google Maps…');
     $('#close-location-picker')?.focus();
+    if (leafletMap) {
+      setStatus('Using OpenStreetMap while Google Maps is unavailable.');
+      const center = chosen || DEFAULT_CENTER;
+      leafletMap.setView([center.lat, center.lng], 15);
+      window.setTimeout(() => leafletMap?.invalidateSize(), 60);
+      readout();
+      return;
+    }
+    if (googleAuthFailed) {
+      await switchToFallback('Previously rejected Google Maps API key');
+      return;
+    }
+    setStatus('');
     try {
       const googleMaps = await loadGoogleMaps();
       if (!modal.classList.contains('open')) return;
+      if (googleAuthFailed) throw new Error('Google Maps authentication was rejected.');
       createMap(googleMaps);
       map.setCenter(chosen || DEFAULT_CENTER);
       window.setTimeout(() => {
@@ -120,7 +208,7 @@
         }
       }, 80);
     } catch (error) {
-      readout(`${error.message} You can still try “Use my current location”.`);
+      await switchToFallback(error.message);
     }
   }
   function close() {
@@ -133,8 +221,8 @@
     if (!isValid({ lat, lng })) return;
     chosen = { lat, lng };
     touched = true;
-    map?.setCenter(chosen);
-    map?.setZoom(16);
+    if (leafletMap) leafletMap.setView([lat, lng], 16);
+    else { map?.setCenter(chosen); map?.setZoom(16); }
     readout();
   }
   function useGps() {
