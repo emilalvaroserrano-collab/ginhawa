@@ -1,0 +1,66 @@
+{
+  "massage": {
+    "name": "Massage Therapy",
+    "description": "Relaxing massage sessions that help you unwind and recharge.",
+    "icon": "hand",
+    "price": 699,
+    "duration": "60–90 min",
+    "active": true
+  },
+  "joint": {
+    "name": "Muscle & Joint Care",
+    "description": "Targeted care for muscular tightness and everyday mobility.",
+    "icon": "bone",
+    "price": 799,
+    "duration": "45–60 min",
+    "active": true
+  },
+  "pain": {
+    "name": "Pain Relief",
+    "description": "Personalized comfort-focused sessions and wellness support.",
+    "icon": "activity",
+    "price": 849,
+    "duration": "45–60 min",
+    "active": true
+  },
+  "alignment": {
+    "name": "Body Alignment",
+    "description": "Guided movement and posture-focused support.",
+    "icon": "body",
+    "price": 899,
+    "duration": "60 min",
+    "active": true
+  },
+  "rehab": {
+    "name": "Rehabilitation",
+    "description": "Practitioner-led mobility sessions where qualifications permit.",
+    "icon": "run",
+    "price": 999,
+    "duration": "60 min",
+    "active": true
+  },
+  "wellness": {
+    "name": "Wellness Programs",
+    "description": "Relaxation, recovery and sustainable self-care routines.",
+    "icon": "lotus",
+    "price": 599,
+    "duration": "Varies",
+    "active": true
+  },
+  "consult": {
+    "name": "Online Consultation",
+    "description": "Talk with an appropriately qualified wellness professional.",
+    "icon": "video",
+    "price": 499,
+    "duration": "30–45 min",
+    "active": true
+  },
+  "home": {
+    "name": "Home Service",
+    "description": "Wellness appointments in the comfort of your own space.",
+    "icon": "home",
+    "price": 1099,
+    "duration": "60–90 min",
+    "active": true
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "catalog": {
+      ".read": true,
+      ".write": "auth !== null && auth.token.admin === true",
+      "services": {
+        ".indexOn": [
+          "active"
+        ]
+      },
+      "therapists": {
+        ".indexOn": [
+          "published",
+          "verified"
+        ]
+      }
+    },
+    "profiles": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth !== null && auth.uid === $uid && !data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['uid', 'displayName', 'email', 'requestedRole', 'createdAt']) && newData.child('uid').val() === $uid && newData.child('email').val() === auth.token.email",
+        "uid": {
+          ".validate": "newData.isString() && newData.val() === $uid"
+        },
+        "displayName": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length <= 254"
+        },
+        "requestedRole": {
+          ".validate": "newData.val() === 'customer' || newData.val() === 'therapist'"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "bookingDrafts": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid || auth.token.admin === true)",
+        ".indexOn": [
+          "createdAt"
+        ],
+        "$draftId": {
+          ".write": "auth !== null && auth.uid === $uid && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists()))",
+          ".validate": "newData.hasChildren(['userId', 'serviceId', 'therapistId', 'mode', 'date', 'time', 'city', 'status', 'createdAt']) && newData.child('userId').val() === $uid && newData.child('status').val() === 'draft'",
+          "userId": {
+            ".validate": "newData.isString() && newData.val() === $uid"
+          },
+          "serviceId": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
+          },
+          "therapistId": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
+          },
+          "mode": {
+            ".validate": "newData.val() === 'home' || newData.val() === 'venue' || newData.val() === 'online'"
+          },
+          "date": {
+            ".validate": "newData.isString() && newData.val().matches(/^20[0-9]{2}-[0-9]{2}-[0-9]{2}$/)"
+          },
+          "time": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 32"
+          },
+          "city": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 90"
+          },
+          "status": {
+            ".validate": "newData.val() === 'draft'"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "bookingRequests": {
+      ".read": false,
+      ".write": false,
+      ".indexOn": [
+        "status",
+        "createdAt"
+      ]
+    },
+    "customerBookings": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": false
+      }
+    },
+    "assignedBookings": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid && auth.token.therapist === true || auth.token.admin === true)",
+        ".write": false
+      }
+    },
+    "providerInbox": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid && auth.token.therapist === true || auth.token.admin === true)",
+        ".write": false
+      }
+    },
+    "providerProfiles": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth !== null && auth.token.admin === true"
+      }
+    },
+    "providerPresence": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth !== null && auth.uid === $uid && auth.token.therapist === true && root.child('providerProfiles').child($uid).child('verified').val() === true && root.child('providerProfiles').child($uid).child('active').val() === true && newData.exists()",
+        ".validate": "newData.hasChildren(['online','lat','lng','updatedAt'])",
+        "online": {
+          ".validate": "newData.isBoolean()"
+        },
+        "lat": {
+          ".validate": "newData.isNumber() && newData.val() >= 4 && newData.val() <= 22"
+        },
+        "lng": {
+          ".validate": "newData.isNumber() && newData.val() >= 116 && newData.val() <= 128"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber() && newData.val() >= now - 120000 && newData.val() <= now + 30000"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "providerPushTokens": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid || auth.token.admin === true)",
+        "$key": {
+          ".write": "auth !== null && auth.uid === $uid && auth.token.therapist === true && root.child('providerProfiles').child($uid).child('verified').val() === true",
+          ".validate": "newData.isString() && newData.val().length > 20 && newData.val().length <= 512"
+        }
+      }
+    },
+    "offersByBooking": {
+      ".read": false,
+      ".write": false
+    },
+    "bookingQuotas": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}
