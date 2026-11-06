@@ -25,6 +25,37 @@ jobs:
           test -s public/booking.html
           test -s public/js/google-maps-config.js
           test -s public/js/location.js
+      - name: Validate frontend JavaScript and assets
+        run: |
+          node --check public/js/app.js
+          node --check public/js/location.js
+          node --input-type=module --check < public/js/firebase.js
+          python3 - <<'PY'
+          import struct, pathlib, json, zlib
+          root=pathlib.Path('public')
+          manifest=json.loads((root/'manifest.webmanifest').read_text())
+          assert (root/manifest['start_url']).is_file()
+          for icon in manifest['icons']:
+              data=(root/icon['src']).read_bytes()
+              assert data[:8]==b'\x89PNG\r\n\x1a\n'
+              w,h=struct.unpack('>II',data[16:24])
+              assert f'{w}x{h}'==icon['sizes']
+              offset=8
+              compressed=bytearray()
+              while offset<len(data):
+                  length=struct.unpack('>I',data[offset:offset+4])[0]
+                  typ=data[offset+4:offset+8]
+                  payload=data[offset+8:offset+8+length]
+                  stored=struct.unpack('>I',data[offset+8+length:offset+12+length])[0]
+                  assert zlib.crc32(typ+payload)&0xffffffff==stored
+                  if typ==b'IDAT':compressed.extend(payload)
+                  offset+=12+length
+              assert len(zlib.decompress(compressed))>w*h*4
+          for path in root.glob('*.html'):
+              assert '<html' in path.read_text().lower()
+          assert 'maps.googleapis.com/maps/api/js' in (root/'js/location.js').read_text()
+          print('Ginhawa PWA static checks passed')
+          PY
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
