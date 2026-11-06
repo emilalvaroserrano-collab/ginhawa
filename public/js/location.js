@@ -46,7 +46,7 @@
     return p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
       && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180;
   }
-  function loadGoogleMaps() {
+  async function loadGoogleMaps() {
     if (window.google?.maps?.Map) return Promise.resolve(window.google.maps);
     if (googleMapsLoading) return googleMapsLoading;
     await import('./runtime-config.js');
