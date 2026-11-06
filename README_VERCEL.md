@@ -23,3 +23,22 @@ Actual committed JPEG assets are referenced by CSS and HTML: `ginhawa-logo.jpg`,
 
 ## Migration
 The prior GitHub Pages custom-domain error (`ginhawa`) does not affect Vercel. You may disable Pages after the Vercel deployment works and Google/Firebase authorized domains are updated.
+
+## Public runtime configuration from Vercel environment (no keys in Git)
+Vercel project settings: **Root Directory: ./; Framework: Other; Build Command: node scripts/build-client-config.mjs; Output Directory: public**.
+Add these keys for Production and Preview before deploying:
+
+```text
+GINHAWA_FIREBASE_API_KEY
+GINHAWA_FIREBASE_AUTH_DOMAIN
+GINHAWA_FIREBASE_DATABASE_URL
+GINHAWA_FIREBASE_PROJECT_ID
+GINHAWA_FIREBASE_STORAGE_BUCKET
+GINHAWA_FIREBASE_MESSAGING_SENDER_ID
+GINHAWA_FIREBASE_APP_ID
+GINHAWA_FIREBASE_MEASUREMENT_ID
+GINHAWA_GOOGLE_MAPS_API_KEY
+GINHAWA_FCM_VAPID_KEY
+```
+
+Use the existing Ginhawa Firebase web config and Google Maps JavaScript browser key values. Deployment generates `public/js/runtime-config.js` from environment variables; tracked source includes an empty fallback only. The build fails with missing variable names (not values) when required credentials are absent. **Browser SDK keys remain visible to visitors after deployment**; use Google Maps API/referrer restrictions, Firebase Auth authorized domains and RTDB rules. Do not store private service account credentials or payment secrets as browser config.

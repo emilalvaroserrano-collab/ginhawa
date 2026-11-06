@@ -1,3 +1,2 @@
-// Generate the PUBLIC VAPID key in Firebase Console > Cloud Messaging > Web Push certificates.
-// This is not a secret. Keep empty until you configure web push.
-window.GINHAWA_FCM_VAPID_KEY='';
+/* Firebase public VAPID key, set through Vercel build environment when web push is enabled. */
+window.GINHAWA_FCM_VAPID_KEY=window.GINHAWA_PUBLIC_CONFIG?.vapidKey||'';

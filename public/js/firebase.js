@@ -1,9 +1,11 @@
+import './runtime-config.js';
 
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,updateProfile,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js';
 import {getDatabase,ref,get,set,update,onDisconnect,onValue,runTransaction,serverTimestamp} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-database.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-functions.js';
-const config={apiKey:'AIzaSyAiRsvAnNal-w7wwOj1YqwemLfffMMagjI',authDomain:'ginhawa-app.firebaseapp.com',databaseURL:'https://ginhawa-app-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'ginhawa-app',storageBucket:'ginhawa-app.firebasestorage.app',messagingSenderId:'341314764610',appId:'1:341314764610:web:d1cdfbb4886dc3dbe552db',measurementId:'G-21040X11RH'};
+const config=window.GINHAWA_PUBLIC_CONFIG?.firebase;
+if(!config?.apiKey||!config?.authDomain||!config?.projectId||!config?.appId)throw new Error('Ginhawa Firebase config missing. Set Vercel build environment variables and redeploy.');
 const app=initializeApp(config),auth=getAuth(app),db=getDatabase(app),functions=getFunctions(app,'asia-southeast1');
 const notify=msg=>window.GinhawaUI?.toast(msg)||console.log(msg);
 const esc=v=>window.GinhawaUI?.escapeHtml(v)||String(v??'');
@@ -12,7 +14,7 @@ await setPersistence(auth,browserLocalPersistence).catch(console.warn);
 function renderUser(user){
  const target=document.getElementById('user-state');if(target)target.textContent=user?('Signed in: '+(user.displayName||user.email)):'Not signed in';
  const profile=document.getElementById('profile-state');if(profile)profile.textContent=user?('Welcome, '+(user.displayName||user.email)):'Sign in to manage your Ginhawa account.';
- document.querySelectorAll('[data-auth-link]').forEach(a=>{a.href=user?'profile.html':'login.html';a.textContent=user?'Account':'Login'});
+ document.querySelectorAll('[data-auth-link]').forEach(a=>{a.href=user?'profile.html':'login.html';const label=a.querySelector('.nav-label');if(label)label.textContent='Account';else a.textContent=user?'Account':'Login'});
  if(user){loadBookings(user);loadOffers(user)}else{const out=document.getElementById('bookings-list');if(out)out.textContent='Sign in to view live bookings.'}
 }
 async function upsertProfile(user,name='',role='customer'){

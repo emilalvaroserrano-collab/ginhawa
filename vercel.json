@@ -33,6 +33,16 @@
           "value": "application/manifest+json"
         }
       ]
+    },
+    {
+      "source": "/js/runtime-config.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
     }
-  ]
+  ],
+  "buildCommand": "node scripts/build-client-config.mjs"
 }

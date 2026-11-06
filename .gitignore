@@ -8,3 +8,8 @@ functions/node_modules/
 !.env.example
 __pycache__/
 *.pyc
+
+# Local deployment settings stay outside version control
+.env
+.env.*
+!.env.example

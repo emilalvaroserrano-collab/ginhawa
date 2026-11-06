@@ -49,7 +49,8 @@
   function loadGoogleMaps() {
     if (window.google?.maps?.Map) return Promise.resolve(window.google.maps);
     if (googleMapsLoading) return googleMapsLoading;
-    const key = window.GINHAWA_GOOGLE_MAPS_KEY;
+    await import('./runtime-config.js');
+    const key = window.GINHAWA_PUBLIC_CONFIG?.googleMapsKey || '';
     if (!key) return Promise.reject(new Error('Google Maps API key has not been configured.'));
     googleMapsLoading = new Promise((resolve, reject) => {
       const callbackName = '__ginhawaGoogleMapsLoaded';
