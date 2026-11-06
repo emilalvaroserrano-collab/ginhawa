@@ -50,7 +50,14 @@ jobs:
                   assert zlib.crc32(typ+payload)&0xffffffff==stored
                   if typ==b'IDAT':compressed.extend(payload)
                   offset+=12+length
-              assert len(zlib.decompress(compressed))>w*h*4
+              # PNG color types include palette-indexed (3), not only RGBA (6).
+              channels={0:1,2:3,3:1,4:2,6:4}.get(data[25])
+              assert channels is not None, f"Invalid PNG color type for {icon['src']}"
+              assert data[28]==0, f"Unsupported interlaced PNG icon: {icon['src']}"
+              row_bytes=(w*channels*data[24]+7)//8
+              expected=h*(1+row_bytes)
+              actual=len(zlib.decompress(compressed))
+              assert actual==expected, f"Invalid PNG pixel payload for {icon['src']}: {actual} != {expected}"
           for path in root.glob('*.html'):
               assert '<html' in path.read_text().lower()
           assert 'maps.googleapis.com/maps/api/js' in (root/'js/location.js').read_text()
